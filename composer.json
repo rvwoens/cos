@@ -3,14 +3,14 @@
     "description": "Very legacy collection of various utility functions",
     "type": "library",
     "require": {
-        "php": "^7|^8",
-        "illuminate/support": "^5.0|^6.0|^7.0|^8.0|^9.0|^10.0"
+        "php": "^7.1|^8.0",
+        "illuminate/support": "^5.0|^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0|^13.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^3.4",
-        "phpunit/phpunit": "^7.5",
-        "friendsofphp/php-cs-fixer": "^2.16",
-        "phpmd/phpmd": "^2.8"
+        "orchestra/testbench": "^3.4|^4.0|^5.0|^6.0|^7.0|^8.0|^9.0|^10.0|^11.0",
+        "phpunit/phpunit": "^7.5|^8.5|^9.5|^10.5|^11.5|^12.5|^13.0",
+        "friendsofphp/php-cs-fixer": "^3.88",
+        "phpmd/phpmd": "^3.0"
     },
     "license": "MIT",
     "keywords": [
@@ -36,6 +36,6 @@
     "scripts": {
         "test": "vendor/bin/phpunit",
         "fix": "vendor/bin/php-cs-fixer fix -v",
-        "smell": "vendor/bin/phpmd src text phpmd-rules.xml"
+        "smell": "vendor/bin/phpmd analyze src --format text --ruleset phpmd-rules.xml"
     }
 }

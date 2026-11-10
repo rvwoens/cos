@@ -7,34 +7,64 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-
+  tests:
+    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }}
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '7.4', laravel: '8' }
+          - { php: '8.1', laravel: '9' }
+          - { php: '8.1', laravel: '10' }
+          - { php: '8.2', laravel: '11' }
+          - { php: '8.3', laravel: '12' }
+          - { php: '8.4', laravel: '13' }
+          - { php: '8.5', laravel: '13' }
+
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php }}
+        coverage: none
+
+    # composer.lock pins a single Laravel version, so resolve fresh for each combination.
+    # The lint tools only run in the lint job (and need a newer PHP), so leave them out here.
+    # Laravel 8-11 all have open security advisories by now; allow them so those versions can still be tested.
+    - name: Install dependencies for Laravel ${{ matrix.laravel }}
+      run: |
+        composer remove --dev friendsofphp/php-cs-fixer phpmd/phpmd --no-update --no-interaction
+        composer require --dev "laravel/framework:^${{ matrix.laravel }}.0" --no-update --no-interaction
+        composer config policy.advisories.block false
+        composer config audit.block-insecure false
+        composer update --prefer-dist --no-interaction --no-progress
+
+    - name: Run test suite
+      run: composer run-script test
+
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        coverage: none
 
     - name: Validate composer.json and composer.lock
       run: composer validate
 
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v2
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-
-
     - name: Install dependencies
-      if: steps.composer-cache.outputs.cache-hit != 'true'
-      run: composer install --prefer-dist --no-progress --no-suggest
-
-    # Add a test script to composer.json, for instance: "test": "vendor/bin/phpunit"
-    # Docs: https://getcomposer.org/doc/articles/scripts.md
-
-    - name: Run test suite
-      run: composer run-script test
+      run: composer install --prefer-dist --no-interaction --no-progress
 
     - name: Run phpmd code smell
       run: composer run-script smell
@@ -42,6 +72,6 @@ jobs:
     - name: Run php-cs-fixer
       run: composer run-script fix
 
-    - uses: stefanzweifel/git-auto-commit-action@v4
+    - uses: stefanzweifel/git-auto-commit-action@v5
       with:
           commit_message: Apply php-cs-fixer changes

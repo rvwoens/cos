@@ -1,10 +1,17 @@
 <?php namespace Cosninix\Cos;
 
-use Config;
+use Closure;
 use Exception;
-use InvalidArgumentException;
-use Log;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Request;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 /**
  * Class Cos - Very static so happy
@@ -14,6 +21,7 @@ class Cos {
 
 	/**
 	 * if v1 is empty, return v1 else v2
+	 * obsolete now we have ??
 	 * @param  [type] $v1 [description]
 	 * @param  [type] $v2 [description]
 	 * @return [type]     [description]
@@ -21,7 +29,13 @@ class Cos {
 	public static function nvl(&$v1, $v2 = null) {
 		return empty($v1) ? $v2 : $v1;
 	}
-
+	/**
+	 * if v1 is not null return v1 else v2
+	 * obsolete now we have ?:
+	 * @param mixed $v1
+	 * @param mixed $v2
+	 * @return mixed
+	 */
 	public static function ifnull($v1, $v2 = null) {
 		return is_null($v1) ? $v2 : $v1;
 	}
@@ -124,10 +138,10 @@ class Cos {
 	 */
 	public static function html_escape($var) {
 		if (is_array($var)) {
-			return array_map('html_escape', $var);
+			return array_map([static::class, 'html_escape'], $var);
 		}
 		else {
-			return htmlspecialchars($var, ENT_QUOTES, config_item('charset'));
+			return htmlspecialchars($var ?? '', ENT_QUOTES, 'UTF-8');
 		}
 	}
 
@@ -142,7 +156,7 @@ class Cos {
 		//		110xxxxx 10xxxxxx
 		//		1110xxxx 10xxxxxx 10xxxxxx
 		//		11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-		$len = strlen($dirty);
+		$len = strlen($dirty ?? '');
 		$clean='';
 		$checkUtf8Seq=0; $utf8Seq='';
 		for($i = 0; $i < $len; $i++){
@@ -201,7 +215,7 @@ class Cos {
 		// Quote if not a number or a numeric string
 		if (!is_numeric($value) || $cast == 'string') {
 			// put single quotes around it.
-			$value = "'".addslashes($value)."'";    // sanitized so safe to use addslashes
+			$value = "'".addslashes($value ?? '')."'";    // sanitized so safe to use addslashes
 		}
 		return $value;
 	}
@@ -216,7 +230,7 @@ class Cos {
 	 * @return string
 	 */
 	public static function uq($value) {    // mysql quoter
-		$value = addslashes($value);    // unsafe: sql-injections possible
+		$value = addslashes($value ?? '');    // unsafe: sql-injections possible
 		return $value;
 	}
 
@@ -231,17 +245,18 @@ class Cos {
 		return str_replace($base, '', $fullpath);
 	}
 
-	public static function LogException($exception, $extra = "") {
-		$pathInfo = Request::getPathInfo();
-		$message = $exception->getMessage() ?: 'Exception';
+	// Obsolete
+	// public static function LogException($exception, $extra = "") {
+	// 	$pathInfo = Request::getPathInfo();
+	// 	$message = $exception->getMessage() ?: 'Exception';
 
-		$file = xcos::PrintablePath($exception->getFile());
-		$line = $exception->getLine();
-		$acc = Account::getCurrentAccount();
-		$accname = $acc ? '<'.$acc->name.'>' : '';
-		Log::error("{$file}:{$line} $accname $message $extra @ //".App::environment()."$pathInfo ");
-		Log::info("$exception"); // stacktrace
-	}
+	// 	$file = xcos::PrintablePath($exception->getFile());
+	// 	$line = $exception->getLine();
+	// 	$acc = Account::getCurrentAccount();
+	// 	$accname = $acc ? '<'.$acc->name.'>' : '';
+	// 	Log::error("{$file}:{$line} $accname $message $extra @ //".App::environment()."$pathInfo ");
+	// 	Log::info("$exception"); // stacktrace
+	// }
 
 	/**
 	 * convert a 0=>vala 1=>valb to a vala=>vala valb=>valb array
@@ -289,6 +304,7 @@ class Cos {
 	 * @return mixed|string
 	 */
 	public static function supertrim($sorg, $case = '') {
+		$sorg = $sorg ?? '';
 		$s = strtr($sorg,
 				   "-_;:'`.,/!?\"",
 				   "            ");
@@ -349,7 +365,7 @@ class Cos {
 	 * @return string
 	 */
 	public static function trimcase($s, $case = '') {
-		$s = trim($s);
+		$s = trim($s ?? '');
 		switch ($case) {
 		case 'U':
 		case 'u':
@@ -369,6 +385,7 @@ class Cos {
 	 * @return bool
 	 */
 	public static function isUrl($url) {
+		$url = $url ?? '';
 		return (strpos($url, 'http://') === 0 || strpos($url, 'https://') === 0);
 	}
 
@@ -378,7 +395,7 @@ class Cos {
 	 * @return bool|string
 	 */
 	public static function url2path($url) {
-		$url = trim($url);
+		$url = trim($url ?? '');
 		if (!$url)
 			return false;    // empty -> empty
 		// GENERIC method - lets find our base
@@ -397,7 +414,7 @@ class Cos {
 	 * @return bool|string
 	 */
 	public static function path2url($file) {
-		$file = trim(str_replace('/mnt/ebs2', '/var/www', $file));    // convert mnt/ebs2 to /var/www due to symlinks
+		$file = trim(str_replace('/mnt/ebs2', '/var/www', $file ?? ''));    // convert mnt/ebs2 to /var/www due to symlinks
 		if (!$file)
 			return '';    // empty -> empty
 		if (strpos($file, 'http://') !== false)
@@ -415,7 +432,7 @@ class Cos {
 	 * @return string
 	 */
 	public static function urlencode($str) {
-		$str = str_replace('/', '@', $str);    // no foreward slashes
+		$str = str_replace('/', '@', $str ?? '');    // no foreward slashes
 		return urlencode($str);
 	}
 
@@ -424,7 +441,7 @@ class Cos {
 	 * @return string
 	 */
 	public static function base64url_encode($data) {
-		return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+		return rtrim(strtr(base64_encode($data ?? ''), '+/', '-_'), '=');
 	}
 
 	/**
@@ -432,7 +449,7 @@ class Cos {
 	 * @return string
 	 */
 	public static function base64url_decode($data) {
-		return base64_decode(strtr($data, '-_', '+/'));
+		return base64_decode(strtr($data ?? '', '-_', '+/'));
 		//return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data)+(strlen($data) % 4), '=', STR_PAD_RIGHT));
 	}
 
@@ -464,7 +481,7 @@ class Cos {
 	 */
 	public static function parseJson($json, &$err = '') {
 		$err = '';
-		$data = json_decode($json, true);    // to assoc array
+		$data = json_decode($json ?? '', true);    // to assoc array
 		if ($data === null) {
 			$json_err = [
 				JSON_ERROR_NONE => '',
@@ -489,7 +506,7 @@ class Cos {
 	 * @return bool|mixed
 	 */
 	public static function callJsonApi($url, $method = 'get', $data = [], &$err = 0, $credentials = null,
-									   callable $sigcalcfunc = null
+									   ?callable $sigcalcfunc = null
 	) {
 		$ispost = (Str::lower($method) == 'post');
 		$header = [
@@ -531,11 +548,12 @@ class Cos {
 		if ($content === false) {
 			// error!
 			$err = curl_error($ch);    // curl_errno($ch)
-			Log('callJsonApi error: '.curl_error($ch)."\nheader send: ".curl_getinfo($ch, CURLINFO_HEADER_OUT));
+			Log::error('callJsonApi error: '.curl_error($ch)."\nheader send: ".curl_getinfo($ch, CURLINFO_HEADER_OUT));
 			return false;
 		}
 		// echo /* tsk::log */ ('callJsonApi: '.$url."\n  OK--> ".$content." ".curl_error($ch));
-		curl_close($ch);
+		if (PHP_VERSION_ID < 80000)
+			curl_close($ch);    // PHP 8+ frees the handle itself; curl_close() is deprecated as of PHP 8.5
 		//echo "---------------------\n".$content."\n----------------\n";
 		$arr = static::parseJson($content);
 		//print_r($arr);echo "\n--------------";
@@ -584,7 +602,7 @@ class Cos {
 		// detect browser language
 		$header_accept_lang = Request::header('Accept-Language');
 		//Log::info('header accept languages: '.$header_accept_lang);
-		$headerlang = Str::lower(substr($header_accept_lang, 0, 2));
+		$headerlang = Str::lower(substr($header_accept_lang ?? '', 0, 2));
 		$availablelang = Config::get('app.available_languages');
 		if ($headerlang && $availablelang && in_array($headerlang, $availablelang)) {
 			// browser lang is supported, use it
@@ -622,7 +640,7 @@ class Cos {
 	 */
 	public static function percDiffString($old, $new, $precision = 1) {
 		// div by zero check
-		if (abs($old) <= 1E-15) {
+		if (abs($old ?? 0) <= 1E-15) {
 			if ($new == 0)
 				return 0;
 			else
@@ -638,7 +656,7 @@ class Cos {
 	 * @return float|int
 	 */
 	public static function percString($part, $total, $precision = 1) {
-		if (abs($total) <= 1E-15) {
+		if (abs($total ?? 0) <= 1E-15) {
 			return 0;
 		}
 		return round(100 * $part / $total, $precision);
@@ -666,13 +684,13 @@ class Cos {
 						return str_replace('$', $translate[$k], $thenval);
 					return $elseval;
 				}
-				return xcos::ifset($translate[$k], 'not found');
+				return static::ifset($translate[$k], 'not found');
 			},
 			$text);
 
 	}
 
-	const encodeKey = "changethistoYOURkey";
+	public const encodeKey = "changethistoYOURkey";
 
 	/**
 	 * encode a numeric id or string to a checked hash string
@@ -783,7 +801,7 @@ class Cos {
 		$index = self::$anyindex;
 		$base = strlen($index);
 		$out = 0;
-		$len = strlen($num) - 1;
+		$len = strlen($num ?? '') - 1;
 		for ($t = 0; $t <= $len; $t++) {
 			$sp = strpos($index, substr($num, $t, 1));
 			if ($sp === false) {

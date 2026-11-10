@@ -52,4 +52,72 @@ class LetsTest extends TestCase {
 		$v2=Cos::sanitizeString($v);
 		$this->assertEquals("illegal utf 2 !# in the middle", $v2);
 	}
+
+	/**
+	 * Call the helpers that go through Laravel facades, so a missing import fails on every Laravel version
+	 */
+	public function testLaravelFacades() {
+		// Crypt
+		$this->assertEquals('1234', Cos::decodeId(Cos::encodeId(1234)));
+		$this->assertFalse(Cos::decodeId(Cos::encodeId(1234, time() - 10)));
+
+		// Request, Str, Config and App
+		$this->app['config']->set('app.available_languages', ['nl', 'en']);
+		$this->app['request']->headers->set('Accept-Language', 'NL-nl,en;q=0.8');
+		$this->assertTrue(Cos::setBrowserLanguage());
+		$this->assertEquals('nl', $this->app->getLocale());
+
+		// URL
+		$this->assertEquals('http://localhost/img/x.png', Cos::path2url('/var/www/site/public/img/x.png'));
+
+		// DB and Closure
+		$this->app['config']->set('database.connections.cos_test', ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
+		$this->app['config']->set('database.default', 'cos_test');
+		$this->assertEquals(42, Cos::safeTransaction(function () {
+			return 42;
+		}));
+	}
+
+	public function testPersonalizeText() {
+		$this->assertEquals('Hello Ronald, not found', Cos::personalizeText('Hello {{ name }}, {{other}}', ['name' => 'Ronald']));
+	}
+
+	/**
+	 * Null input must not trigger the PHP 8.1+ "Passing null to parameter" deprecations
+	 */
+	public function testNullInput() {
+		$deprecations = [];
+		set_error_handler(function ($no, $msg, $file, $line) use (&$deprecations) {
+			$deprecations[] = "$msg @ ".basename($file).":$line";
+			return true;
+		}, E_DEPRECATED);
+		try {
+			$this->assertSame('', Cos::sanitizeString(null));
+			$this->assertSame("''", Cos::muq(null));
+			$this->assertSame('', Cos::uq(null));
+			$this->assertSame('', Cos::html_escape(null));
+			$this->assertSame('', Cos::supertrim(null));
+			$this->assertSame('', Cos::slug(null));
+			$this->assertSame('', Cos::trimcase(null));
+			$this->assertFalse(Cos::isUrl(null));
+			$this->assertFalse(Cos::url2path(null));
+			$this->assertSame('', Cos::path2url(null));
+			$this->assertSame('', Cos::urlencode(null));
+			$this->assertSame('', Cos::base64url_encode(null));
+			$this->assertSame('', Cos::base64url_decode(null));
+			$this->assertNull(Cos::parseJson(null));
+			$this->assertSame(0, Cos::percDiffString(null, 0));
+			$this->assertSame(0, Cos::percString(1, null));
+			$this->app['request']->headers->remove('Accept-Language');
+			$this->assertFalse(Cos::setBrowserLanguage());
+		} finally {
+			restore_error_handler();
+		}
+		$this->assertSame([], $deprecations);
+	}
+
+	public function testHtmlEscape() {
+		$this->assertEquals('&lt;b&gt;', Cos::html_escape('<b>'));
+		$this->assertEquals(['&amp;', '&#039;'], Cos::html_escape(['&', "'"]));
+	}
 }

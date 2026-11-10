@@ -39,7 +39,7 @@ $rules = [
     ],
     'no_closing_tag'=>true,                     //  The closing `?''>` tag MUST be omitted from files containing only PHP.
     'no_spaces_after_function_name'=>true,      // When making a method or function call, there MUST NOT be a space between the method or function name and the opening parenthesis.
-    'no_spaces_inside_parenthesis'=>true,       //There MUST NOT be a space after the opening parenthesis. There MUST NOT be a space before the closing parenthesis.
+    'spaces_inside_parentheses'=>true,          //There MUST NOT be a space after the opening parenthesis. There MUST NOT be a space before the closing parenthesis. (was no_spaces_inside_parenthesis in v2)
     'no_trailing_whitespace'=>true,             // Remove trailing whitespace at the end of non-blank lines.
     'no_trailing_whitespace_in_comment'=>true,  // There MUST be no trailing spaces inside comment or PHPDoc.
     'single_blank_line_at_eof'=>true,           // A PHP file without end tag must always end with a single empty line feed.
@@ -50,7 +50,7 @@ $rules = [
     'single_line_after_imports'=>true,          // Each namespace use MUST go on its own line and there MUST be one blank line after the use statements block.
     'switch_case_semicolon_to_colon'=>true,     // A case should be followed by a colon and not a semicolon.
     'switch_case_space'=>true,                  // Removes extra spaces between colon and case value.
-    'visibility_required'=>true,                // Visibility MUST be declared on all properties and methods; `abstract` and `final` MUST be declared before the visibility; `static` MUST be declared after the visibility.
+    'modifier_keywords'=>true,                  // (was visibility_required) Visibility MUST be declared on all properties and methods; `abstract` and `final` MUST be declared before the visibility; `static` MUST be declared after the visibility.
 
     // Other
     //'blank_line_before_return' => false,      // An empty line feed should precede a return statement. DEPRECATED: use `blank_line_before_statement` instead.
@@ -69,7 +69,10 @@ $rules = [
     'no_empty_phpdoc'=>true,
     'phpdoc_align' => false,
     'phpdoc_indent' => true,
-    'phpdoc_inline_tag' => true,
+    // v2 'phpdoc_inline_tag' was split into these three in v3
+    'general_phpdoc_tag_rename' => true,
+    'phpdoc_inline_tag_normalizer' => true,
+    'phpdoc_tag_type' => true,
     'phpdoc_no_access' => true,
     'phpdoc_no_package' => true,
     'phpdoc_order' => true,
@@ -100,8 +103,8 @@ $finder = Finder::create()
     ->exclude($excludes)
     ->notName('*.blade.php');
 
-return Config::create()->setRules($rules)
-             ->setFinder(Finder::create()->in(__DIR__))
+return (new Config())->setRules($rules)
+             ->setFinder($finder)
              ->setUsingCache(false)
              ->setIndent("\t")              // tabs trump spaces
              ->setLineEnding("\n")          // who needs MSDOS
